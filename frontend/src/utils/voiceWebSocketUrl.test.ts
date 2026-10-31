@@ -22,3 +22,13 @@ test('显式 API 地址和相对 API 地址与 REST 请求保持一致', () => {
   assert.equal(buildVoiceWebSocketUrl(42, 'https://api.example/backend', 'https://interview.example/'),
     'wss://api.example/backend/ws/voice-interview/42');
 });
+
+test('传入访问令牌时追加 token 查询参数（WS 握手鉴权）', () => {
+  assert.equal(
+    buildVoiceWebSocketUrl(42, '', 'http://127.0.0.1:4186/', 'jwt-token'),
+    'ws://127.0.0.1:4186/ws/voice-interview/42?token=jwt-token');
+  assert.equal(buildVoiceWebSocketUrl(42, '', 'http://127.0.0.1:4186/', null),
+    'ws://127.0.0.1:4186/ws/voice-interview/42');
+  assert.equal(buildVoiceWebSocketUrl(42, '', 'http://127.0.0.1:4186/', ''),
+    'ws://127.0.0.1:4186/ws/voice-interview/42');
+});
