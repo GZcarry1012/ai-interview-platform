@@ -25,7 +25,9 @@ import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import software.amazon.awssdk.services.s3.model.S3Exception;
 
+import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.UUID;
@@ -72,6 +74,41 @@ public class FileStorageService {
     }
 
     /**
+     * 上传工程师准入简历（合作伙伴业务负责人录入工程师时上传）
+     */
+    public String uploadEngineerResume(MultipartFile file) {
+        return uploadFile(file, "engineer-resumes");
+    }
+
+    /**
+     * 归档本地文件（如分片合并后的面试视频）到指定前缀下
+     */
+    public String uploadLocalFile(File file, String prefix, String originalFilename) {
+        String fileKey = generateFileKey(originalFilename, prefix);
+        try {
+            PutObjectRequest putRequest = PutObjectRequest.builder()
+                    .bucket(storageConfig.getBucket())
+                    .key(fileKey)
+                    .contentType(guessVideoContentType(originalFilename))
+                    .contentLength(file.length())
+                    .build();
+            s3Client.putObject(putRequest, RequestBody.fromFile(file));
+            log.info("本地文件归档成功: {} -> {} ({} bytes)", originalFilename, fileKey, file.length());
+            return fileKey;
+        } catch (S3Exception e) {
+            log.error("归档本地文件到RustFS失败: {}", e.getMessage(), e);
+            throw new BusinessException(ErrorCode.STORAGE_UPLOAD_FAILED, "文件归档失败: " + e.getMessage());
+        }
+    }
+
+    private String guessVideoContentType(String filename) {
+        if (filename != null && filename.toLowerCase().endsWith(".mp4")) {
+            return "video/mp4";
+        }
+        return "video/webm";
+    }
+
+    /**
      * 删除知识库文件
      */
     public void deleteKnowledgeBase(String fileKey) {
@@ -97,6 +134,25 @@ public class FileStorageService {
             return s3Client.getObjectAsBytes(getRequest).asByteArray();
         } catch (S3Exception e) {
             log.error("下载文件失败: {} - {}", fileKey, e.getMessage(), e);
+            throw new BusinessException(ErrorCode.STORAGE_DOWNLOAD_FAILED, "文件下载失败: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 流式下载（大文件如面试视频，避免整文件载入内存）
+     * 调用方负责关闭返回的 InputStream
+     */
+    public InputStream openStream(String fileKey) {
+        try {
+            GetObjectRequest getRequest = GetObjectRequest.builder()
+                    .bucket(storageConfig.getBucket())
+                    .key(fileKey)
+                    .build();
+            return s3Client.getObject(getRequest);
+        } catch (NoSuchKeyException e) {
+            throw new BusinessException(ErrorCode.STORAGE_DOWNLOAD_FAILED, "文件不存在: " + fileKey);
+        } catch (S3Exception e) {
+            log.error("流式下载失败: {} - {}", fileKey, e.getMessage(), e);
             throw new BusinessException(ErrorCode.STORAGE_DOWNLOAD_FAILED, "文件下载失败: " + e.getMessage());
         }
     }

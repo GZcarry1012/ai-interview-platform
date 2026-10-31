@@ -1,4 +1,5 @@
 import axios, { AxiosInstance, AxiosRequestConfig } from 'axios';
+import { clearTokens, getAccessToken } from './tokenStorage';
 
 declare module 'axios' {
   interface AxiosRequestConfig {
@@ -23,6 +24,26 @@ export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '';
 const instance: AxiosInstance = axios.create({
   baseURL: API_BASE_URL,
   timeout: 60000,
+});
+
+/** 认证失败的业务码：清除本地凭证并跳转登录页 */
+const AUTH_EXPIRED_CODES = new Set([401, 12005, 12006]);
+
+function handleAuthExpired(): void {
+  clearTokens();
+  const current = window.location.pathname + window.location.search;
+  if (!window.location.pathname.startsWith('/login')) {
+    window.location.assign(`/login?from=${encodeURIComponent(current)}`);
+  }
+}
+
+// 请求拦截器：附加 Bearer 令牌
+instance.interceptors.request.use((config) => {
+  const token = getAccessToken();
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
 });
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -124,6 +145,10 @@ instance.interceptors.response.use(
         // 成功：返回 data
         response.data = result.data;
         return response;
+      }
+      // 认证失效：清理凭证并跳转登录页
+      if (AUTH_EXPIRED_CODES.has(result.code)) {
+        handleAuthExpired();
       }
       // 失败：直接抛出 message
       return Promise.reject(new Error(result.message || '请求失败'));

@@ -137,6 +137,16 @@ public class GlobalExceptionHandler {
     }
 
     /**
+     * 处理方法级授权失败（@PreAuthorize 抛出的 AccessDeniedException）
+     */
+    @ExceptionHandler(org.springframework.security.access.AccessDeniedException.class)
+    @ResponseStatus(HttpStatus.OK)
+    public Result<Void> handleAccessDeniedException(org.springframework.security.access.AccessDeniedException e) {
+        log.warn("访问被拒绝: {}", e.getMessage());
+        return Result.error(ErrorCode.FORBIDDEN, "无权执行该操作");
+    }
+
+    /**
      * 处理请求方法不支持异常
      */
     @ExceptionHandler(org.springframework.web.HttpRequestMethodNotSupportedException.class)

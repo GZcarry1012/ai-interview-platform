@@ -1,7 +1,8 @@
 import {Link, Outlet, useLocation, useNavigate} from 'react-router-dom';
 import {motion} from 'framer-motion';
-import {BookOpen, Calendar, ChevronRight, Database, FileStack, MessageSquare, Moon, Settings, Sparkles, Sun, Users,} from 'lucide-react';
+import {BookOpen, Calendar, ChevronRight, ClipboardCheck, Database, FileStack, LogOut, MessageSquare, Moon, Settings, ShieldCheck, Sparkles, Sun, Users,} from 'lucide-react';
 import {useTheme} from '../hooks/useTheme';
+import {useAuth} from '../hooks/useAuth';
 import {useState} from 'react';
 import UnifiedInterviewModal, {UnifiedInterviewConfig} from './UnifiedInterviewModal';
 import {ROUTES} from '../constants/routes';
@@ -25,6 +26,8 @@ export default function Layout() {
   const currentPath = location.pathname;
   const {theme, toggleTheme} = useTheme();
   const navigate = useNavigate();
+  const {user, logout} = useAuth();
+  const [loggingOut, setLoggingOut] = useState(false);
   const [interviewModalPreset, setInterviewModalPreset] = useState<{
     defaultMode: 'text' | 'voice';
     defaultResumeId?: number;
@@ -80,8 +83,20 @@ export default function Layout() {
     });
   };
 
-  // 按业务模块组织的导航项
+  // 按业务模块组织的导航项；业务管理组仅企业端角色可见
+  const isBackofficeUser = user != null && ['PARTNER_ADMIN', 'REVIEWER', 'INTERVIEWER', 'ADMIN'].includes(user.role);
+  const isReviewUser = user != null && ['REVIEWER', 'ADMIN'].includes(user.role);
   const navGroups: NavGroup[] = [
+    ...(isBackofficeUser ? [{
+      id: 'business',
+      title: '业务管理',
+      items: [
+        { id: 'engineers', path: '/engineers', label: '工程师准入', icon: ShieldCheck, description: '资料录入、审核与邀约' },
+        ...(isReviewUser ? [
+          { id: 'review', path: '/review', label: '人工复核', icon: ClipboardCheck, description: '视频回放与 AI 评分复核' },
+        ] : []),
+      ],
+    } as NavGroup] : []),
     {
       id: 'interview',
       title: '面试准备',
@@ -220,10 +235,39 @@ export default function Layout() {
           </div>
         </nav>
 
-        {/* 底部信息 */}
-        <div className="p-4 border-t border-slate-100 dark:border-slate-700">
+        {/* 底部：当前用户与退出 */}
+        <div className="p-4 border-t border-slate-100 dark:border-slate-700 space-y-2">
+          {user && (
+            <div className="px-3 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary-500 to-primary-600 flex items-center justify-center text-white text-sm font-semibold shrink-0">
+                  {user.displayName.slice(0, 1)}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-slate-800 dark:text-white truncate">{user.displayName}</p>
+                  <p className="text-xs text-primary-600 dark:text-primary-400">{user.roleDisplayName ?? user.role}</p>
+                </div>
+                <button
+                  onClick={async () => {
+                    setLoggingOut(true);
+                    try {
+                      await logout();
+                      navigate(ROUTES.login, { replace: true });
+                    } finally {
+                      setLoggingOut(false);
+                    }
+                  }}
+                  disabled={loggingOut}
+                  title="退出登录"
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors disabled:opacity-50"
+                >
+                  <LogOut className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          )}
           <div className="px-3 py-2 bg-gradient-to-r from-primary-50 to-indigo-50 dark:from-primary-900/30 dark:to-slate-800 rounded-xl">
-            <p className="text-xs text-primary-600 dark:text-primary-400 font-medium">AI 面试助手 v1.0</p>
+            <p className="text-xs text-primary-600 dark:text-primary-400 font-medium">AI 面试助手 v1.1</p>
             <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">Powered by AI</p>
           </div>
         </div>

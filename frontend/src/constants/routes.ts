@@ -5,6 +5,12 @@ export const ROUTES = {
   resumeUpload: '/upload',
   resumeHistory: '/history',
   knowledgebaseUpload: '/knowledgebase/upload',
+  login: '/login',
+  register: '/register',
+  engineers: '/engineers',
+  review: '/review',
+  reviewDetail: (id: number) => `/review/${id}`,
+  invitation: (token: string) => `/invitation/${token}`,
 } as const;
 
 export const ROUTE_PATTERNS = {

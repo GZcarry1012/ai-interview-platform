@@ -183,4 +183,48 @@ public final class AsyncTaskStreamConstants {
      * LLM Provider字段
      */
     public static final String FIELD_LLM_PROVIDER = "llmProvider";
+
+    // ========== 面试邀约邮件 Stream 配置 ==========
+
+    /**
+     * 面试邀约邮件 Stream Key
+     */
+    public static final String INVITATION_MAIL_STREAM_KEY = "invitation:mail:stream";
+
+    /**
+     * 面试邀约邮件 Consumer Group 名称
+     */
+    public static final String INVITATION_MAIL_GROUP_NAME = "invitation-mail-group";
+
+    /**
+     * 面试邀约邮件 Consumer 名称前缀
+     */
+    public static final String INVITATION_MAIL_CONSUMER_PREFIX = "invitation-mail-consumer-";
+
+    /**
+     * 邀约ID字段
+     */
+    public static final String FIELD_INVITATION_ID = "invitationId";
+
+    // ========== 候选人 AI 评分 Stream 配置 ==========
+
+    /**
+     * 候选人 AI 评分 Stream Key
+     */
+    public static final String SCORING_STREAM_KEY = "candidate:scoring:stream";
+
+    /**
+     * 候选人 AI 评分 Consumer Group 名称
+     */
+    public static final String SCORING_GROUP_NAME = "scoring-group";
+
+    /**
+     * 候选人 AI 评分 Consumer 名称前缀
+     */
+    public static final String SCORING_CONSUMER_PREFIX = "scoring-consumer-";
+
+    /**
+     * 候选人面试会话ID字段
+     */
+    public static final String FIELD_CANDIDATE_INTERVIEW_ID = "candidateInterviewId";
 }

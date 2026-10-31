@@ -81,7 +81,46 @@ public enum ErrorCode {
     MODULE_NOT_FOUND(11008, "模块不存在"),
     VOICE_CONFIG_READ_FAILED(11009, "读取语音服务配置失败"),
     VOICE_CONFIG_WRITE_FAILED(11010, "写入语音服务配置失败"),
-    VOICE_CONFIG_TEST_FAILED(11011, "语音服务连通性测试失败");
+    VOICE_CONFIG_TEST_FAILED(11011, "语音服务连通性测试失败"),
+
+    // ========== 认证授权模块错误 12xxx ==========
+    AUTH_USERNAME_EXISTS(12001, "用户名已存在"),
+    AUTH_EMAIL_EXISTS(12002, "邮箱已被使用"),
+    AUTH_INVALID_CREDENTIALS(12003, "用户名或密码错误"),
+    AUTH_ACCOUNT_DISABLED(12004, "账号已被禁用"),
+    AUTH_TOKEN_INVALID(12005, "登录状态无效，请重新登录"),
+    AUTH_TOKEN_EXPIRED(12006, "登录已过期，请重新登录"),
+    AUTH_WEAK_PASSWORD(12007, "密码强度不足，至少 6 位"),
+    AUTH_USER_NOT_FOUND(12008, "用户不存在"),
+    AUTH_ROLE_INVALID(12009, "角色不合法"),
+    AUTH_REFRESH_TOKEN_INVALID(12010, "刷新凭证无效，请重新登录"),
+
+    // ========== 工程师准入模块错误 13xxx ==========
+    ENGINEER_NOT_FOUND(13001, "工程师不存在"),
+    ENGINEER_DUPLICATE(13002, "该工程师已存在（邮箱或手机号重复）"),
+    ENGINEER_RESUME_REQUIRED(13003, "请上传工程师简历附件"),
+    ENGINEER_RESUME_UPLOAD_FAILED(13004, "工程师简历上传失败"),
+    ENGINEER_STATUS_INVALID(13005, "当前状态不允许该操作"),
+    ENGINEER_NO_PERMISSION(13006, "无权操作该工程师"),
+
+    // ========== 面试邀约模块错误 14xxx ==========
+    INVITATION_CREATE_FAILED(14001, "创建面试邀约失败"),
+    INVITATION_NOT_FOUND(14002, "面试邀约不存在"),
+    INVITATION_TOKEN_INVALID(14003, "邀约链接无效或已失效"),
+    INVITATION_ALREADY_CONFIRMED(14004, "该邀约已确认，请勿重复操作"),
+    INVITATION_ENGINEER_NOT_APPROVED(14005, "工程师尚未通过简历审核，无法发送邀约"),
+    INVITATION_MAIL_SEND_FAILED(14006, "面试邀约邮件发送失败"),
+
+    // ========== 候选人视频面试模块错误 15xxx ==========
+    CANDIDATE_SESSION_NOT_FOUND(15001, "面试会话不存在"),
+    CANDIDATE_TOKEN_INVALID(15002, "面试链接无效，请使用邮件中的链接进入"),
+    CANDIDATE_NOT_CONFIRMED(15003, "请先确认参加面试"),
+    CANDIDATE_ALREADY_SUBMITTED(15004, "面试答卷已提交，请勿重复操作"),
+    VIDEO_UPLOAD_SESSION_NOT_FOUND(15011, "上传会话不存在，请重新发起"),
+    VIDEO_CHUNK_INVALID(15012, "分片数据无效"),
+    VIDEO_CHUNK_MISSING(15013, "存在缺失分片，请续传后重试"),
+    VIDEO_SIZE_EXCEEDED(15014, "视频文件超出大小限制"),
+    VIDEO_MERGE_FAILED(15015, "视频合并失败，请重新上传");
 
     private final Integer code;
     private final String message;
