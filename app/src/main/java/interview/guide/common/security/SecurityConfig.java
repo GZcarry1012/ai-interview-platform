@@ -45,6 +45,7 @@ public class SecurityConfig {
             .requestMatchers("/api/auth/**").permitAll()
             .requestMatchers("/api/invitations/token/**").permitAll() // 候选人凭邀约令牌访问，无需登录
             .requestMatchers("/api/candidate/**").permitAll() // 候选人视频面试（token 在业务层校验）
+            .requestMatchers(HttpMethod.GET, "/api/review/interviews/*/score-stream").permitAll() // 评分进度 SSE（EventSource 无 Authorization 头，token 查询参数在业务层校验）
             .requestMatchers("/sse/**", "/mcp/**").permitAll() // MCP Server SSE 端点
             .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
             .requestMatchers("/actuator/health/**", "/actuator/liveness", "/actuator/readiness",

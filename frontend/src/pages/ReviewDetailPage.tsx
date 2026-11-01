@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
   Bot,
@@ -12,8 +12,16 @@ import {
 } from 'lucide-react';
 import reviewApi from '../api/review';
 import { getErrorMessage } from '../api/request';
+import { getAccessToken } from '../api/tokenStorage';
 import type { ReviewDetail } from '../api/review';
 import type { DimensionScore } from '../types/scoring';
+
+/** Agent 评分实时进度事件（SSE） */
+interface AgentStepEvent {
+  step: string;
+  tool?: string;
+  description: string;
+}
 
 export default function ReviewDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -24,6 +32,8 @@ export default function ReviewDetailPage() {
   const [actionError, setActionError] = useState('');
   const [busy, setBusy] = useState(false);
   const [comment, setComment] = useState('');
+  const [agentSteps, setAgentSteps] = useState<AgentStepEvent[]>([]);
+  const eventSourceRef = useRef<EventSource | null>(null);
 
   const load = useCallback(async () => {
     if (!id) {
@@ -42,26 +52,50 @@ export default function ReviewDetailPage() {
     load();
   }, [load]);
 
+  /** 评分进行中时订阅 SSE 进度流（替代轮询） */
+  useEffect(() => {
+    if (!id || detail?.aiScoreStatus !== 'RUNNING') {
+      return;
+    }
+    const token = getAccessToken();
+    const source = new EventSource(
+      `/api/review/interviews/${id}/score-stream${token ? `?token=${encodeURIComponent(token)}` : ''}`);
+    eventSourceRef.current = source;
+
+    source.addEventListener('agent-step', (e) => {
+      try {
+        const step = JSON.parse((e as MessageEvent).data) as AgentStepEvent;
+        setAgentSteps((prev) => [...prev, step]);
+      } catch {
+        // 忽略解析失败
+      }
+    });
+    source.addEventListener('done', () => {
+      source.close();
+      eventSourceRef.current = null;
+      load();
+    });
+    source.addEventListener('error', () => {
+      source.close();
+      eventSourceRef.current = null;
+      load();
+    });
+    return () => {
+      source.close();
+      eventSourceRef.current = null;
+    };
+  }, [id, detail?.aiScoreStatus, load]);
+
   const handleTrigger = async () => {
     if (!id || busy) {
       return;
     }
     setBusy(true);
     setActionError('');
+    setAgentSteps([]);
     try {
       await reviewApi.triggerAiScore(Number(id));
-      // 触发后开始轮询评分状态
-      const timer = setInterval(async () => {
-        try {
-          const d = await reviewApi.detail(Number(id));
-          setDetail(d);
-          if (d.aiScoreStatus === 'COMPLETED' || d.aiScoreStatus === 'FAILED') {
-            clearInterval(timer);
-          }
-        } catch {
-          clearInterval(timer);
-        }
-      }, 4000);
+      await load();
     } catch (err) {
       setActionError(getErrorMessage(err));
     } finally {
@@ -168,6 +202,23 @@ export default function ReviewDetailPage() {
 
         {detail.aiScoreStatus === 'FAILED' && (
           <p className="text-sm text-red-500">评分失败：{detail.aiScoreError}</p>
+        )}
+
+        {agentSteps.length > 0 && (
+          <div className="border-l-2 border-primary-200 dark:border-primary-800 pl-4 space-y-1.5">
+            {agentSteps.map((step, i) => (
+              <p key={i} className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                {step.step === 'done' ? (
+                  <CheckCircle2 className="w-3 h-3 text-emerald-500" />
+                ) : step.step === 'fallback' || step.step === 'error' ? (
+                  <XCircle className="w-3 h-3 text-amber-500" />
+                ) : (
+                  <Loader2 className="w-3 h-3 text-primary-400" />
+                )}
+                {step.description}
+              </p>
+            ))}
+          </div>
         )}
 
         {detail.aiScore ? (

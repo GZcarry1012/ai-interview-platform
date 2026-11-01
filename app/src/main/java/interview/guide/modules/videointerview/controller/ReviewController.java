@@ -19,6 +19,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -94,6 +95,19 @@ public class ReviewController {
         .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"interview.webm\"")
         .contentType(MediaType.parseMediaType("video/webm"))
         .body(resource);
+  }
+
+  /**
+   * AI 评分进度 SSE 流（EventSource 无法带 Authorization 头，token 走查询参数，
+   * 服务端校验令牌与审核侧角色；方法级 permitAll 覆盖类级注解，
+   * 鉴权在 registerScoreStream 内完成）
+   */
+  @PreAuthorize("permitAll()")
+  @GetMapping(value = "/{id}/score-stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+  public org.springframework.web.servlet.mvc.method.annotation.SseEmitter scoreStream(
+      @PathVariable Long id,
+      @RequestParam(value = "token", required = false) String token) {
+    return reviewService.registerScoreStream(id, token);
   }
 
   /**

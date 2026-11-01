@@ -5,6 +5,9 @@ import interview.guide.common.exception.BusinessException;
 import interview.guide.common.exception.ErrorCode;
 import interview.guide.common.transaction.TransactionalExecutor;
 import interview.guide.modules.engineer.model.EngineerEntity;
+import interview.guide.modules.knowledgebase.repository.KnowledgeBaseRepository;
+import interview.guide.modules.knowledgebase.service.KnowledgeBaseVectorService;
+import interview.guide.modules.scoring.config.ScoringProperties;
 import interview.guide.modules.engineer.repository.EngineerRepository;
 import interview.guide.modules.engineer.service.EngineerService;
 import interview.guide.modules.engineer.model.AuditAction;
@@ -15,7 +18,9 @@ import interview.guide.modules.videointerview.model.CandidateInterviewEntity;
 import interview.guide.modules.videointerview.model.CandidateInterviewStatus;
 import interview.guide.modules.videointerview.repository.CandidateInterviewRepository;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Map;
+import org.springframework.ai.document.Document;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
@@ -45,6 +50,10 @@ public class AgentScoringService {
   private final EngineerRepository engineerRepository;
   private final EngineerService engineerService;
   private final TransactionalExecutor transactionalExecutor;
+  private final KnowledgeBaseVectorService knowledgeBaseVectorService;
+  private final KnowledgeBaseRepository knowledgeBaseRepository;
+  private final ScoringProperties scoringProperties;
+  private final ScoringProgressEmitter progressEmitter;
   private final PromptTemplate systemPromptTemplate;
   private final PromptTemplate userPromptTemplate;
   private final String standardsText;
@@ -55,7 +64,11 @@ public class AgentScoringService {
       InterviewInvitationRepository invitationRepository,
       EngineerRepository engineerRepository,
       EngineerService engineerService,
-      TransactionalExecutor transactionalExecutor
+      TransactionalExecutor transactionalExecutor,
+      KnowledgeBaseVectorService knowledgeBaseVectorService,
+      KnowledgeBaseRepository knowledgeBaseRepository,
+      ScoringProperties scoringProperties,
+      ScoringProgressEmitter progressEmitter
   ) {
     this.llmProviderRegistry = llmProviderRegistry;
     this.interviewRepository = interviewRepository;
@@ -63,6 +76,10 @@ public class AgentScoringService {
     this.engineerRepository = engineerRepository;
     this.engineerService = engineerService;
     this.transactionalExecutor = transactionalExecutor;
+    this.knowledgeBaseVectorService = knowledgeBaseVectorService;
+    this.knowledgeBaseRepository = knowledgeBaseRepository;
+    this.scoringProperties = scoringProperties;
+    this.progressEmitter = progressEmitter;
     this.systemPromptTemplate = new PromptTemplate(
         loadPrompt("classpath:prompts/agent-scoring-system.st"));
     this.userPromptTemplate = new PromptTemplate(
@@ -122,11 +139,16 @@ public class AgentScoringService {
         "engineerName", safe(engineer.getName()),
         "position", safe(engineer.getPosition())));
 
+    progressEmitter.emit(interviewId, "agent-step",
+        Map.of("step", "start", "description", "Agent 开始收集评分证据"));
     ScoringTools tools = new ScoringTools(
         standardsText,
+        this::searchScoringStandards,
         buildProfile(engineer),
         truncate(safe(engineer.getResumeText()), RESUME_MAX_CHARS),
-        truncate(safe(interview.getAnswers()), RESUME_MAX_CHARS));
+        truncate(safe(interview.getAnswers()), RESUME_MAX_CHARS),
+        interviewId,
+        progressEmitter);
 
     Exception lastError = null;
     for (int attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
@@ -148,6 +170,8 @@ public class AgentScoringService {
     }
     log.warn("工具调用模式降级为单轮内联评分: interviewId={}, lastError={}",
         interviewId, lastError != null ? lastError.getMessage() : "unknown");
+    progressEmitter.emit(interviewId, "agent-step",
+        Map.of("step", "fallback", "description", "工具链路异常，切换单轮内联评分"));
     return runInlineFallback(user, tools, converter);
   }
 
@@ -165,7 +189,7 @@ public class AgentScoringService {
         {format}
         """;
     String inlineSystemRendered = inlineSystem.replace("{format}", converter.getFormat());
-    String inlineUser = "面试会话评估任务：\n\n【评分标准】\n" + tools.getScoringStandards()
+    String inlineUser = "面试会话评估任务：\n\n【评分标准】\n" + tools.getScoringStandardsOverview()
         + "\n\n【候选人画像】\n" + tools.getEngineerProfile()
         + "\n\n【简历全文】\n" + tools.getResumeText()
         + "\n\n【面试答卷】\n" + tools.getInterviewAnswers();
@@ -197,6 +221,43 @@ public class AgentScoringService {
         + "\n工作年限: " + (engineer.getExperienceYears() != null ? engineer.getExperienceYears() : "未填写")
         + "\n学历: " + safe(engineer.getEducation())
         + "\n技能: " + safe(engineer.getSkills());
+  }
+
+  /**
+   * 评分标准向量检索：按分类定位标准知识库 → pgvector 相似度检索相关片段。
+   * 标准库不存在或检索异常时返回 null（工具层回退到静态标准全文）。
+   * 该方法在 Agent 工具调用线程执行，不在任何事务内（含 embedding 网络调用）
+   */
+  private String searchScoringStandards(String query) {
+    try {
+      var rubricKbs = knowledgeBaseRepository
+          .findByCategoryOrderByUploadedAtDesc(scoringProperties.getRubricCategory());
+      if (rubricKbs.isEmpty()) {
+        log.debug("评分标准知识库（分类 {}）为空，使用静态标准", scoringProperties.getRubricCategory());
+        return null;
+      }
+      List<Long> kbIds = rubricKbs.stream().map(kb -> kb.getId()).toList();
+      List<Document> documents =
+          knowledgeBaseVectorService.similaritySearch(query, kbIds,
+              scoringProperties.getRubricTopK(), scoringProperties.getRubricMinScore());
+      if (documents.isEmpty()) {
+        return null;
+      }
+      StringBuilder builder = new StringBuilder();
+      for (org.springframework.ai.document.Document doc : documents) {
+        Object source = doc.getMetadata().get("file_name");
+        builder.append("【标准片段")
+            .append(source != null ? " · " + source : "")
+            .append("】\n")
+            .append(doc.getText())
+            .append("\n---\n");
+      }
+      log.info("评分标准检索完成: query={}, 命中 {} 片段", query, documents.size());
+      return builder.toString();
+    } catch (Exception e) {
+      log.warn("评分标准向量检索失败，回退静态标准: {}", e.getMessage());
+      return null;
+    }
   }
 
   private String truncate(String text, int maxChars) {

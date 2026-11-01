@@ -15,6 +15,9 @@ import interview.guide.modules.scoring.listener.ScoringStreamProducer;
 import interview.guide.modules.scoring.model.AgentScoreReport;
 import interview.guide.modules.videointerview.dto.ReviewDetailDTO;
 import interview.guide.modules.videointerview.dto.ReviewListItemDTO;
+import interview.guide.common.security.AuthUserLoader;
+import interview.guide.common.security.JwtTokenProvider;
+import interview.guide.modules.scoring.service.ScoringProgressEmitter;
 import interview.guide.modules.videointerview.model.CandidateInterviewEntity;
 import interview.guide.modules.videointerview.model.CandidateInterviewStatus;
 import interview.guide.modules.videointerview.model.AiScoreStatus;
@@ -49,6 +52,9 @@ public class ReviewService {
   private final FileStorageService fileStorageService;
   private final ScoringStreamProducer scoringStreamProducer;
   private final TransactionalExecutor transactionalExecutor;
+  private final JwtTokenProvider jwtTokenProvider;
+  private final AuthUserLoader authUserLoader;
+  private final ScoringProgressEmitter progressEmitter;
 
   public ReviewService(CandidateInterviewRepository interviewRepository,
       InterviewInvitationRepository invitationRepository,
@@ -56,7 +62,10 @@ public class ReviewService {
       EngineerService engineerService,
       FileStorageService fileStorageService,
       ScoringStreamProducer scoringStreamProducer,
-      TransactionalExecutor transactionalExecutor) {
+      TransactionalExecutor transactionalExecutor,
+      JwtTokenProvider jwtTokenProvider,
+      AuthUserLoader authUserLoader,
+      ScoringProgressEmitter progressEmitter) {
     this.interviewRepository = interviewRepository;
     this.invitationRepository = invitationRepository;
     this.engineerRepository = engineerRepository;
@@ -64,6 +73,9 @@ public class ReviewService {
     this.fileStorageService = fileStorageService;
     this.scoringStreamProducer = scoringStreamProducer;
     this.transactionalExecutor = transactionalExecutor;
+    this.jwtTokenProvider = jwtTokenProvider;
+    this.authUserLoader = authUserLoader;
+    this.progressEmitter = progressEmitter;
   }
 
   /**
@@ -165,6 +177,35 @@ public class ReviewService {
         .map(CandidateInterviewEntity::getVideoFileKey)
         .filter(key -> key != null && !key.isBlank());
   }
+
+  /**
+   * 注册评分进度 SSE 连接
+   *
+   * EventSource 无法携带 Authorization 头，token 走查询参数；
+   * 校验通过且角色为审核侧时注册，否则抛出鉴权异常
+   */
+  public org.springframework.web.servlet.mvc.method.annotation.SseEmitter registerScoreStream(
+      Long interviewId, String token) {
+    if (token == null || token.isBlank()) {
+      throw new BusinessException(ErrorCode.UNAUTHORIZED, "缺少访问令牌");
+    }
+    io.jsonwebtoken.Claims claims;
+    try {
+      claims = jwtTokenProvider.parseToken(token);
+    } catch (io.jsonwebtoken.JwtException e) {
+      throw new BusinessException(ErrorCode.AUTH_TOKEN_INVALID, "访问令牌无效");
+    }
+    if (claims == null) {
+      throw new BusinessException(ErrorCode.AUTH_TOKEN_EXPIRED);
+    }
+    var principal = authUserLoader.loadActiveUser(claims);
+    if (principal == null || !List.of("REVIEWER", "ADMIN").contains(principal.role())) {
+      throw new BusinessException(ErrorCode.FORBIDDEN, "无权查看评分进度");
+    }
+    return progressEmitter.register(interviewId);
+  }
+
+
 
   /** 视频大小（字节）；未知返回 -1 */
   public long videoFileSize(Long interviewId) {

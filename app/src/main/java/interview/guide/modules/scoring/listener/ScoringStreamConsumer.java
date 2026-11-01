@@ -4,6 +4,7 @@ import interview.guide.common.async.AbstractStreamConsumer;
 import interview.guide.common.constant.AsyncTaskStreamConstants;
 import interview.guide.infrastructure.redis.RedisService;
 import interview.guide.modules.scoring.service.AgentScoringService;
+import interview.guide.modules.scoring.service.ScoringProgressEmitter;
 import interview.guide.modules.videointerview.model.AiScoreStatus;
 import interview.guide.modules.videointerview.repository.CandidateInterviewRepository;
 import java.util.HashMap;
@@ -23,13 +24,16 @@ public class ScoringStreamConsumer extends AbstractStreamConsumer<Long> {
 
   private final CandidateInterviewRepository interviewRepository;
   private final AgentScoringService agentScoringService;
+  private final ScoringProgressEmitter progressEmitter;
 
   public ScoringStreamConsumer(RedisService redisService,
       CandidateInterviewRepository interviewRepository,
-      AgentScoringService agentScoringService) {
+      AgentScoringService agentScoringService,
+      ScoringProgressEmitter progressEmitter) {
     super(redisService);
     this.interviewRepository = interviewRepository;
     this.agentScoringService = agentScoringService;
+    this.progressEmitter = progressEmitter;
   }
 
   @Override
@@ -88,6 +92,9 @@ public class ScoringStreamConsumer extends AbstractStreamConsumer<Long> {
       interview.setAiScoreStatus(AiScoreStatus.COMPLETED);
       interviewRepository.save(interview);
     });
+    progressEmitter.emit(interviewId, "done", Map.of(
+        "status", "COMPLETED",
+        "message", "AI 评分完成"));
   }
 
   @Override
@@ -97,6 +104,9 @@ public class ScoringStreamConsumer extends AbstractStreamConsumer<Long> {
       interview.setAiScoreError(error);
       interviewRepository.save(interview);
     });
+    progressEmitter.emit(interviewId, "error", Map.of(
+        "status", "FAILED",
+        "message", error == null ? "AI 评分失败" : error));
   }
 
   @Override

@@ -3,7 +3,8 @@
 
 # 工具使用要求（重要）
 你拥有以下信息工具，必须按需调用收集评估证据，禁止在未收集证据前凭空评分或编造内容：
-- getScoringStandards：获取本岗位的评分标准与维度定义（建议最先调用，明确评分口径）
+- searchScoringStandards：按主题检索岗位评分标准的相关片段（建议最先调用，可多次检索：如"评分维度与权重"、"项目真实性核验细则"）
+- getScoringStandardsOverview：评分标准完整文本（检索不到所需片段时的兜底）
 - getEngineerProfile：候选人基本画像（岗位/年限/学历/技能）
 - getResumeText：候选人简历全文（用于核对答卷所述经历是否一致）
 - getInterviewAnswers：候选人面试答卷原文
