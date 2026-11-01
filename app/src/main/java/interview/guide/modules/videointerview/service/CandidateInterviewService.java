@@ -7,6 +7,7 @@ import interview.guide.modules.invitation.model.InvitationStatus;
 import interview.guide.modules.invitation.repository.InterviewInvitationRepository;
 import interview.guide.modules.videointerview.config.VideoUploadProperties;
 import interview.guide.modules.videointerview.dto.CandidateSessionDTO;
+import interview.guide.modules.videointerview.listener.ExtractionStreamProducer;
 import interview.guide.modules.videointerview.model.CandidateInterviewEntity;
 import interview.guide.modules.videointerview.model.CandidateInterviewStatus;
 import interview.guide.modules.videointerview.repository.CandidateInterviewRepository;
@@ -36,6 +37,7 @@ public class CandidateInterviewService {
   private final CandidateInterviewRepository interviewRepository;
   private final InterviewInvitationRepository invitationRepository;
   private final VideoUploadProperties properties;
+  private final ExtractionStreamProducer extractionStreamProducer;
 
   @Transactional
   public CandidateSessionDTO getSession(String token) {
@@ -48,6 +50,9 @@ public class CandidateInterviewService {
 
   /**
    * 提交答卷（视频可与答卷先后提交，均完成后会话置为 COMPLETED）
+   *
+   * 提交成功后入队多模态抽取任务（音轨转写 + 关键帧视觉分析），
+   * 入队失败不影响答卷提交结果（可由审核侧手动重试）
    */
   @Transactional
   public CandidateSessionDTO submitAnswers(String token, String answersJson) {
@@ -62,7 +67,15 @@ public class CandidateInterviewService {
     log.info("候选人答卷已提交: interviewId={}", interview.getId());
     InterviewInvitationEntity invitation = invitationRepository.findByToken(token)
         .orElseThrow(() -> new BusinessException(ErrorCode.CANDIDATE_TOKEN_INVALID));
-    return toDTO(interview, invitation);
+
+    if (interview.getVideoFileKey() != null && !interview.getVideoFileKey().isBlank()) {
+      boolean extractionQueued = extractionStreamProducer.enqueue(interview.getId());
+      if (extractionQueued) {
+        log.info("多模态抽取任务已入队: interviewId={}", interview.getId());
+      }
+    }
+    CandidateSessionDTO dto = toDTO(interview, invitation);
+    return dto;
   }
 
   private CandidateInterviewEntity createInterview(InterviewInvitationEntity invitation) {

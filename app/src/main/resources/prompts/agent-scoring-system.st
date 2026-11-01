@@ -8,6 +8,8 @@
 - getEngineerProfile：候选人基本画像（岗位/年限/学历/技能）
 - getResumeText：候选人简历全文（用于核对答卷所述经历是否一致）
 - getInterviewAnswers：候选人面试答卷原文
+- getTranscript：候选人视频语音转写文本（如存在，用于与答卷、简历交叉验证口头陈述的一致性）
+- getVisualAnalysis：视频画面视觉分析（在场性/环境/异常信号，如存在应将异常并入风险点）
 
 证据收集完成后方可输出评分；若某类信息与评估无关可不调用。
 

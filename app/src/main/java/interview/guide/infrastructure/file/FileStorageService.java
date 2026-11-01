@@ -109,6 +109,29 @@ public class FileStorageService {
     }
 
     /**
+     * 归档本地文件并设置公开读（供第三方服务按 URL 拉取，如 DashScope 文件转写）
+     */
+    public String uploadLocalFilePublic(File file, String prefix, String originalFilename,
+            String contentType) {
+        String fileKey = generateFileKey(originalFilename, prefix);
+        try {
+            PutObjectRequest putRequest = PutObjectRequest.builder()
+                    .bucket(storageConfig.getBucket())
+                    .key(fileKey)
+                    .contentType(contentType)
+                    .contentLength(file.length())
+                    .acl(software.amazon.awssdk.services.s3.model.ObjectCannedACL.PUBLIC_READ)
+                    .build();
+            s3Client.putObject(putRequest, RequestBody.fromFile(file));
+            log.info("公开读文件归档成功: {} -> {}", originalFilename, fileKey);
+            return fileKey;
+        } catch (S3Exception e) {
+            log.error("公开读文件归档失败: {}", e.getMessage(), e);
+            throw new BusinessException(ErrorCode.STORAGE_UPLOAD_FAILED, "文件归档失败: " + e.getMessage());
+        }
+    }
+
+    /**
      * 删除知识库文件
      */
     public void deleteKnowledgeBase(String fileKey) {

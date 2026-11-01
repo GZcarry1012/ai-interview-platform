@@ -147,6 +147,8 @@ public class AgentScoringService {
         buildProfile(engineer),
         truncate(safe(engineer.getResumeText()), RESUME_MAX_CHARS),
         truncate(safe(interview.getAnswers()), RESUME_MAX_CHARS),
+        truncate(safe(interview.getTranscript()), RESUME_MAX_CHARS),
+        safe(interview.getVisualAnalysis()),
         interviewId,
         progressEmitter);
 

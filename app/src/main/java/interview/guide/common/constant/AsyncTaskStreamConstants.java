@@ -227,4 +227,21 @@ public final class AsyncTaskStreamConstants {
      * 候选人面试会话ID字段
      */
     public static final String FIELD_CANDIDATE_INTERVIEW_ID = "candidateInterviewId";
+
+    // ========== 视频多模态抽取 Stream 配置 ==========
+
+    /**
+     * 视频多模态抽取 Stream Key
+     */
+    public static final String VIDEO_EXTRACT_STREAM_KEY = "video:extract:stream";
+
+    /**
+     * 视频多模态抽取 Consumer Group 名称
+     */
+    public static final String VIDEO_EXTRACT_GROUP_NAME = "video-extract-group";
+
+    /**
+     * 视频多模态抽取 Consumer 名称前缀
+     */
+    public static final String VIDEO_EXTRACT_CONSUMER_PREFIX = "video-extract-consumer-";
 }

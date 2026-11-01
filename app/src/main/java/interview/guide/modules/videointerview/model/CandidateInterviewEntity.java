@@ -92,6 +92,28 @@ public class CandidateInterviewEntity {
   @Column(name = "human_reviewed_at")
   private LocalDateTime humanReviewedAt;
 
+  // ===== 多模态：语音转写与视觉分析 =====
+
+  @Column(name = "transcript", columnDefinition = "TEXT")
+  private String transcript;
+
+  @Enumerated(EnumType.STRING)
+  @Column(name = "transcript_status", nullable = false, length = 16)
+  private TranscriptStatus transcriptStatus = TranscriptStatus.NOT_STARTED;
+
+  @Column(name = "transcript_error", columnDefinition = "TEXT")
+  private String transcriptError;
+
+  @Column(name = "visual_analysis", columnDefinition = "TEXT")
+  private String visualAnalysis;
+
+  @Enumerated(EnumType.STRING)
+  @Column(name = "visual_status", nullable = false, length = 16)
+  private VisualStatus visualStatus = VisualStatus.NOT_STARTED;
+
+  @Column(name = "visual_error", columnDefinition = "TEXT")
+  private String visualError;
+
   @Column(name = "started_at")
   private LocalDateTime startedAt;
 

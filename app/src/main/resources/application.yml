@@ -119,6 +119,12 @@ app:
         embedding-model: text-embedding-v3
         embedding-dimensions: 1024
         supports-embedding: true
+      # 视觉分析专用 Provider（qwen-vl 多模态，与文字模型分离便于独立切换）
+      dashscope-vlm:
+        base-url: https://dashscope.aliyuncs.com/compatible-mode/v1
+        api-key: ${AI_BAILIAN_API_KEY}
+        model: ${MEDIA_VLM_MODEL:qwen-vl-plus}
+        supports-embedding: false
       lmstudio:
         base-url: http://localhost:1234
         api-key: ${PROVIDER_LMSTUDIO_API_KEY:lm-studio}
@@ -268,6 +274,14 @@ app:
   video-upload:
     staging-dir: ${VIDEO_UPLOAD_STAGING_DIR:}
     max-video-size-mb: ${VIDEO_UPLOAD_MAX_SIZE_MB:500}
+
+  # 媒体处理（FFmpeg + 多模态评分）
+  media:
+    ffmpeg-path: ${FFMPEG_PATH:}
+    keyframe-interval-seconds: ${MEDIA_KEYFRAME_INTERVAL_SECONDS:10}
+    vlm-model: ${MEDIA_VLM_MODEL:qwen-vl-plus}
+    dashscope-api-key: ${AI_BAILIAN_API_KEY:}
+    max-frames-per-analysis: ${MEDIA_MAX_FRAMES:12}
 
   # MCP Server（向外部 Agent 客户端暴露面试评分工具）
   mcp:

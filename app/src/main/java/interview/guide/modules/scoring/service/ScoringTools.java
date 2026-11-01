@@ -21,17 +21,22 @@ public class ScoringTools {
   private final String profile;
   private final String resumeText;
   private final String answers;
+  private final String transcript;
+  private final String visualAnalysis;
   private final Long interviewId;
   private final ScoringProgressEmitter progressEmitter;
 
   public ScoringTools(String standardsOverview, Function<String, String> standardsSearch,
       String profile, String resumeText, String answers,
+      String transcript, String visualAnalysis,
       Long interviewId, ScoringProgressEmitter progressEmitter) {
     this.standardsOverview = standardsOverview;
     this.standardsSearch = standardsSearch;
     this.profile = profile;
     this.resumeText = resumeText;
     this.answers = answers;
+    this.transcript = transcript;
+    this.visualAnalysis = visualAnalysis;
     this.interviewId = interviewId;
     this.progressEmitter = progressEmitter;
   }
@@ -72,6 +77,22 @@ public class ScoringTools {
   public String getInterviewAnswers() {
     emitToolCall("getInterviewAnswers", "读取面试答卷");
     return answers;
+  }
+
+  @Tool(description = "获取候选人视频语音转写文本（口头陈述原文，用于与答卷和简历交叉验证）。可能不存在")
+  public String getTranscript() {
+    emitToolCall("getTranscript", "读取语音转写文本");
+    return transcript == null || transcript.isBlank()
+        ? "本会话无语音转写文本"
+        : transcript;
+  }
+
+  @Tool(description = "获取视频画面视觉分析结果（在场性/环境/异常信号，用于风险判断）。可能不存在")
+  public String getVisualAnalysis() {
+    emitToolCall("getVisualAnalysis", "读取视频视觉分析");
+    return visualAnalysis == null || visualAnalysis.isBlank()
+        ? "本会话无视觉分析结果"
+        : visualAnalysis;
   }
 
   private void emitToolCall(String tool, String description) {
